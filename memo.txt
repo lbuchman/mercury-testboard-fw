@@ -1,0 +1,1 @@
+/Applications/Teensyduino.app/Contents/Java/hardware/tools/teensy_post_compile - board=TEENSY41 -file=MercHwRig -path=/Users/leo/Documents/myGitHub/MercHWRig/build -tools=/Applications/Teensyduino.app/Contents/Java/hardware/tools  -reboot
