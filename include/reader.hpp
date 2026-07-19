@@ -8,7 +8,10 @@
 
 class Reader {
 public:
-    Reader(Scheduler& scheduler, readerPins& readerPins, String commandPrefix): ts(scheduler), pins(readerPins), prefix(commandPrefix) {
+    Reader(Scheduler& scheduler, readerPins& readerPins, String commandPrefix)
+        : ts(scheduler),
+          pins(readerPins),
+          prefix(commandPrefix) {
         pinMode(pins.d0.pinN, pins.d0.pinMode);
         pinMode(pins.d1.pinN, pins.d1.pinMode);
         pinMode(pins.rLed.pinN, pins.rLed.pinMode);
@@ -32,24 +35,13 @@ public:
         ShellFunctor::getInstance().add(prefix + "bz", getBz);
     }
 
-    int getRLedPin() { return digitalRead(pins.rLed.pinN); }
-    int getGLedPin() { return digitalRead(pins.gLed.pinN); }
-    int getBzPin() { return digitalRead(pins.bz.pinN); }
-    int getD0Value() { return pins.d0.value; }
-    int getD1Value() { return pins.d1.value; }
-    int getRLedPinN() { return pins.rLed.pinN; }
-    int getGLedPinN() { return pins.gLed.pinN; }
-    int getBzPinN() { return pins.bz.pinN; }
-    int getD0pinN() { return pins.d0.pinN; }
-    int getD1PinN() { return pins.d1.pinN; }
-
 private:
     Scheduler& ts;
     readerPins& pins;
     String prefix;
 
     shellFunc setD0 = [this](int arg_cnt, char** args, Stream& stream) -> int {
-        if (!checkArgument(2, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"0|1\", \"desc\": \"set D0\" },\n\r", stream)) {
+        if (!checkArgument(2, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"0|1\", \"desc\": \"set D0\" }", stream)) {
             return 1;
         }
 
@@ -60,7 +52,7 @@ private:
     };
 
     shellFunc getD0 = [this](int arg_cnt, char** args, Stream& stream) -> int {
-        if (!checkArgument(1, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"none\", \"desc\": \"read D0\" },\n\r", stream)) {
+        if (!checkArgument(1, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"none\", \"desc\": \"read D0\" }", stream)) {
             return 1;
         }
 
@@ -69,7 +61,7 @@ private:
     };
 
     shellFunc setD1 = [this](int arg_cnt, char** args, Stream& stream) -> int {
-        if (!checkArgument(2, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"0|1\", \"desc\": \"set D1\" },\n\r", stream)) {
+        if (!checkArgument(2, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"0|1\", \"desc\": \"set D1\" }", stream)) {
             return 1;
         }
 
@@ -80,7 +72,7 @@ private:
     };
 
     shellFunc getD1 = [this](int arg_cnt, char** args, Stream& stream) -> int {
-        if (!checkArgument(1, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"none\", \"desc\": \"read D1\" },\n\r", stream)) {
+        if (!checkArgument(1, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"none\", \"desc\": \"read D1\" }", stream)) {
             return 1;
         }
 
@@ -89,7 +81,7 @@ private:
     };
 
     shellFunc getRLed = [this](int arg_cnt, char** args, Stream& stream) -> int {
-        if (!checkArgument(1, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"none\", \"desc\": \"read red led input state\" },\n\r", stream)) {
+        if (!checkArgument(1, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"none\", \"desc\": \"read red led input state\" }", stream)) {
             return 1;
         }
 
@@ -98,7 +90,8 @@ private:
     };
 
     shellFunc getGLed = [this](int arg_cnt, char** args, Stream& stream) -> int {
-        if (!checkArgument(1, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"none\", \"desc\": \"read green led input state\" },\n\r", stream)) {
+        if (!checkArgument(1, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"none\", \"desc\": \"read green led input state\" }",
+                           stream)) {
             return 1;
         }
 
@@ -107,7 +100,7 @@ private:
     };
 
     shellFunc getBz = [this](int arg_cnt, char** args, Stream& stream) -> int {
-        if (!checkArgument(1, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"none\", \"desc\": \"read buzzer input state\" },\n\r", stream)) {
+        if (!checkArgument(1, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"none\", \"desc\": \"read buzzer input state\" }", stream)) {
             return 1;
         }
 
@@ -115,13 +108,14 @@ private:
         return 1;
     };
 
-    Task osdpTask { TASK_MILLISECOND, TASK_FOREVER, [this]() {
-                       if (pins.serial.available()) {
-                           char inChar = pins.serial.read();
-                           pins.serial.write(inChar);
-                       }
-                   },
-                   &ts, false };
+    Task osdpTask{TASK_MILLISECOND, TASK_FOREVER,
+                  [this]() {
+                      if (pins.serial.available()) {
+                          char inChar = pins.serial.read();
+                          pins.serial.write(inChar);
+                      }
+                  },
+                  &ts, false};
 };
 
 #endif

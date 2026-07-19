@@ -25,151 +25,152 @@ SOFTWARE.
 #define UDPTERMINAL___H
 
 #include <Arduino.h>
-#include <wiring.h>
-#include <memory>
-#include <utility>
 #include <ArduinoJson.h>
-#include <logger.hpp>
 #include <NativeEthernet.h>
 #include <TaskSchedulerDeclarations.h>
-#include <etherUtilities.h>
 #include <argvp.h>
+#include <etherUtilities.h>
+#include <logger.hpp>
+#include <memory>
 #include <shellFunctor.hpp>
 #include <simpleEvents.h>
+#include <utility>
+#include <wiring.h>
 
-#define OUTPUT_BUFFER_SIZE 4096*2
+#define OUTPUT_BUFFER_SIZE 4096 * 2
 #define INPUT_BUFFER_SIZE 4096
 
-class UdpStream: public Stream {
-    public:
-        UdpStream() {
-            buffer[0] = 0;
-        };
-        void begin() {}
-        virtual int available(void) {
-            return pointer;
-        };
+class UdpStream : public Stream {
+public:
+    UdpStream() { buffer[0] = 0; };
+    void begin() {}
+    virtual int available(void) { return pointer; };
 
-        virtual int peek(void) {
-            return 0;
-        };
+    virtual int peek(void) { return 0; };
 
-        virtual void flush(void) {
-            pointer = 0;
-            buffer[0] = 0;
-        };
+    virtual void flush(void) {
+        pointer = 0;
+        buffer[0] = 0;
+    };
 
-        int getStreamSize() {
-            return pointer;
+    int getStreamSize() { return pointer; }
+
+    virtual size_t write(uint8_t c) {
+        if (pointer < OUTPUT_BUFFER_SIZE - 1) {
+            buffer[pointer] = c;
+            pointer += 1;
         }
 
-        virtual size_t write(uint8_t c) {
-            if(pointer < OUTPUT_BUFFER_SIZE) {
-                buffer[pointer] = c;
-                pointer += 1;
-            }
+        return 1;
+    }
 
-            return 1;
-        }
+    virtual int read(void) { return 0; };
 
-        virtual int read(void) {
-            return 0;
-        };
+    char* getBuffer() {
+        buffer[pointer] = 0;
+        return buffer;
+    }
 
-        char* getBuffer() {
-            buffer[pointer] = 0;
-            return buffer;
-
-        }
-    private:
-        char buffer[OUTPUT_BUFFER_SIZE];
-        int pointer = 0;
+private:
+    char buffer[OUTPUT_BUFFER_SIZE];
+    int pointer = 0;
 };
 
+class UdpTerminal : public SimpleEvent {
+public:
+    UdpTerminal(ShellFunctor& _shell, int _port, Scheduler& ts_)
+        : shell(_shell),
+          port(_port),
+          ts(ts_) {};
 
-class UdpTerminal: public SimpleEvent {
-    public:
-        UdpTerminal(ShellFunctor& _shell, int _port, Scheduler& ts_): shell(_shell), port(_port), ts(ts_) {
-        };
+    void begin(void) {
+        Udp.begin(port);
+        dataInTask.enable();
+    };
 
-        void begin(void) {
-            Udp.begin(port);
-            dataInTask.enable();
-        };
+private:
+    ShellFunctor& shell;
+    EthernetUDP Udp;
+    int port;
+    JsonDocument doc;
 
-    private:
-        ShellFunctor& shell;
-        EthernetUDP Udp;
-        int  port;
-        JsonDocument doc;
+    char buffer[1024 * 2];
+    UdpStream stream;
+    Scheduler& ts;
+    static constexpr int dataPullInterval = TASK_MILLISECOND * 50;
 
-        char buffer[1024 * 2];
-        UdpStream stream;
-        Scheduler& ts;
-        static constexpr int dataPullInterval = TASK_MILLISECOND * 50;
+    Task dataInTask{dataPullInterval,
+                    TASK_FOREVER,
+                    [this](void) -> void {
+                        int packetSize = Udp.parsePacket();
 
-        Task dataInTask{dataPullInterval, TASK_FOREVER, [this](void) -> void {
-                int packetSize = Udp.parsePacket();
+                        if (packetSize) {
+                            // powerSetFullSpeed();
 
-                if(packetSize) {
-                    // powerSetFullSpeed();
+                            if (packetSize < static_cast<int>(sizeof(buffer))) {
+                                Udp.read(buffer, packetSize);
+                            } else {
+                                logger().error(logger().printHeader, (char*)__FILE__, __LINE__,
+                                               "Received packet of size %d exceeds buffer size %d", packetSize, sizeof(buffer));
 
-                    if(packetSize < INPUT_BUFFER_SIZE - 1) {
-                        Udp.read(buffer, packetSize);
-                    }
-                    else {
-                        logger().error(logger().printHeader, (char*) __FILE__, __LINE__, "Received packet of size %d exeeds buffer size %d", packetSize, INPUT_BUFFER_SIZE);
-                        return;
-                    }
+                                while (Udp.available()) {
+                                    Udp.read();
+                                }
 
-                    //char tmpStr1[32];
-                    //logger().info(logger().printHeader, (char*) __FILE__, __LINE__, "Received packet from %s", ipToString(Udp.remoteIP(), tmpStr1).c_str()) ;
-                    buffer[packetSize] = 0;
-                    doc.clear();
-                    DeserializationError error = deserializeJson(doc, buffer);
+                                return;
+                            }
 
-                    if(error != error.Code::Ok) {
-                        logger().error(logger().printHeader, (char*) __FILE__, __LINE__,  "{ \"error\": %s, \"status\": false,  }", error.c_str());
-                        return;
-                    }
+                            //char tmpStr1[32];
+                            //logger().info(logger().printHeader, (char*) __FILE__, __LINE__, "Received packet from %s", ipToString(Udp.remoteIP(), tmpStr1).c_str()) ;
+                            buffer[packetSize] = 0;
+                            doc.clear();
+                            DeserializationError error = deserializeJson(doc, buffer);
 
-                    JsonObject jsonDocument = doc.as<JsonObject>();
-                    String cmd = jsonDocument["cmd"];
-                    String arg = jsonDocument["arg"];
-                    String cmdLine = cmd;
+                            if (error != error.Code::Ok) {
+                                logger().error(logger().printHeader, (char*)__FILE__, __LINE__, "{ \"error\": %s, \"status\": false,  }",
+                                               error.c_str());
+                                return;
+                            }
 
-                    if(arg != "null") {
-                        cmdLine = cmd + " " + arg;
-                    }
+                            JsonObject jsonDocument = doc.as<JsonObject>();
+                            String cmd = jsonDocument["cmd"];
+                            String arg = jsonDocument["arg"];
+                            String cmdLine = cmd;
 
-                    constexpr size_t argc_MAX = 16;
-                    char* argv[argc_MAX] = { 0 };
-                    int argc = 0;
-                    parseStrToArgcArgvInsitu((char*) cmdLine.c_str(), argc_MAX, &argc, argv);
-                    stream.flush();
-                    logger().debug(logger().printHeader, (char*) __FILE__, __LINE__,  "udp get cmd: %s", argv[0]);
-                    shell(argv[0], argc, argv, stream);
+                            if (arg != "null") {
+                                cmdLine = cmd + " " + arg;
+                            }
 
+                            constexpr size_t argc_MAX = 16;
+                            char* argv[argc_MAX] = {0};
+                            int argc = 0;
+                            parseStrToArgcArgvInsitu((char*)cmdLine.c_str(), argc_MAX, &argc, argv);
+                            stream.flush();
+                            logger().debug(logger().printHeader, (char*)__FILE__, __LINE__, "udp get cmd: %s", argv[0]);
+                            shell(argv[0], argc, argv, stream);
 
-                    if(!Udp.beginPacket(Udp.remoteIP(), Udp.remotePort())) {
-                        return;
-                    }
+                            if (!Udp.beginPacket(Udp.remoteIP(), Udp.remotePort())) {
+                                return;
+                            }
 
-                    if(!stream.getStreamSize()) {
-                        JsonDocument doc;
-                        JsonObject  retData =  doc.to<JsonObject>();
-                        retData["cmd"] = "missing command reply, bug?";
-                        retData["status"] = false;
-                        serializeJsonPretty(retData, stream);
-                        return;
-                    }
+                            if (!stream.getStreamSize()) {
+                                JsonDocument doc;
+                                JsonObject retData = doc.to<JsonObject>();
+                                retData["cmd"] = "missing command reply, bug?";
+                                retData["status"] = false;
+                                serializeJsonPretty(retData, stream);
+                                return;
+                            }
 
-                    Udp.write(stream.getBuffer(), stream.getStreamSize());
-                    Udp.endPacket();
-                    stream.flush();
-                }
-            }, &ts, false, NULL, NULL
-        };
+                            Udp.write(stream.getBuffer(), stream.getStreamSize());
+                            Udp.endPacket();
+                            stream.flush();
+                        }
+                    },
+                    &ts,
+                    false,
+                    NULL,
+                    NULL};
 };
 
 #endif

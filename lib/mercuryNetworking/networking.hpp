@@ -4,6 +4,6 @@
 #include <TaskSchedulerDeclarations.h>
 #include <singleLEDLibraryMod.h>
 
-void initNetworking(Scheduler& ts, sllibMod& watchDogLed);
+void initNetworking(Scheduler& ts, sllibMod& watchDogLed, bool networkConfigValid);
 
 #endif

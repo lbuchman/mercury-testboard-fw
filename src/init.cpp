@@ -21,8 +21,20 @@
 
 Scheduler ts;
 
-readerPins rd1Pins = { {9, OUTPUT, 0, 0}, {10, OUTPUT, 0, 0}, {5, INPUT_PULLUP, 0, 0}, {11, INPUT_PULLUP, 0, 0}, {40, INPUT_PULLUP, 0, 0}, {6, OUTPUT, 0, 0}, Serial2 };
-readerPins rd2Pins = { {32, OUTPUT, 0, 0}, {26, OUTPUT, 0, 0}, {12, INPUT_PULLUP, 0, 0}, {30, INPUT_PULLUP, 0, 0}, {39, INPUT_PULLUP, 0, 0}, {27, OUTPUT, 0, 0}, Serial7 };
+readerPins rd1Pins = {{9, OUTPUT, 0, 0},
+                      {10, OUTPUT, 0, 0},
+                      {5, INPUT_PULLUP, 0, 0},
+                      {11, INPUT_PULLUP, 0, 0},
+                      {40, INPUT_PULLUP, 0, 0},
+                      {6, OUTPUT, 0, 0},
+                      Serial2};
+readerPins rd2Pins = {{32, OUTPUT, 0, 0},
+                      {26, OUTPUT, 0, 0},
+                      {12, INPUT_PULLUP, 0, 0},
+                      {30, INPUT_PULLUP, 0, 0},
+                      {39, INPUT_PULLUP, 0, 0},
+                      {27, OUTPUT, 0, 0},
+                      Serial7};
 int Rs485TermPin = 31;
 int rl1pin = 23;
 int rl2pin = 3;
@@ -35,13 +47,13 @@ int sp3pin = 19;
 int sp4pin = 15;
 
 Task watchDogTask((WD_EXPIRE * TASK_SECOND) / 3, TASK_FOREVER,
-                    [](void) -> void {
-                        static int value = 0;
-                        digitalWrite(WATCHDOG_LED, value);
-                        value = value ^ 1;
-                        watchdog();
-                    },
-                    &ts, false, NULL, NULL);
+                  [](void) -> void {
+                      static int value = 0;
+                      digitalWrite(WATCHDOG_LED, value);
+                      value = value ^ 1;
+                      watchdog();
+                  },
+                  &ts, false, NULL, NULL);
 
 int setupFw() {
     pinMode(Rs485TermPin, OUTPUT);
@@ -54,19 +66,20 @@ int setupFw() {
     loggerInit((Stream&)LoggerSerialDev);
     static sllibMod watchDogLed(WATCHDOG_LED, false);
     logger().warn(logger().printHeader, __FILE__, __LINE__, "*************** REBOOT ********************");
-    logger().info(logger().printHeader, __FILE__, __LINE__, "Mercury test board FW ver %f. Build Time <%s-%s>", FWVERSION, __DATE__, __TIME__);
+    logger().info(logger().printHeader, __FILE__, __LINE__, "Mercury test board FW ver %f. Build Time <%s-%s>", FWVERSION, __DATE__,
+                  __TIME__);
     logger().setLogLevel(logLevel::kLogInfo);
 
     watchDogTask.enable();
     enableWatchdog();
     watchDogLed.begin();
     boardInit();
-    persistentDataInit();
-    initNetworking(ts, watchDogLed);
+    bool networkConfigValid = persistentDataInit();
+    initNetworking(ts, watchDogLed, networkConfigValid);
 
     static SerialTerminal serialTerminalPi(cshell, ts);
     serialTerminalPi.begin(&CmdSerialDev, false, NULL, false);
-    static TCPTerminal tCPTerminal {cshell, 23, ts};
+    static TCPTerminal tCPTerminal{cshell, 23, ts};
     tCPTerminal.begin();
     static UdpTerminal udpTerminal(cshell, 4111, ts);
     udpTerminal.begin();
@@ -143,16 +156,6 @@ int setupFw() {
         stream.println();
         return 1;
     });
-
-    shellFunc getAllData = [&](int arg_cnt, char** args, Stream& stream) -> int {
-        if (!checkArgument(1, arg_cnt, args, "\t{ \"cmd\": \"%s\", \"arg\": \"none\", \"desc\": \"get all active pins value\" },\n\r", stream)) {
-            return 1;
-        }
-
-        stream.printf("\t{ \"cmd\": \"%s\", \"status\": true, \"values\": [{\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}, {\"pin\": %d, \"value\": %d}]}\n\r", args[0], rl1.getPin(), rl1.getValue(), rl2.getPin(), rl2.getValue(), rl3.getPin(), rl3.getValue(), rl4.getPin(), rl4.getValue(), sp_i1.getPin(), sp_i1.getValue(), sp_i2.getPin(), sp_i2.getValue(), sp_i3.getPin(), sp_i3.getValue(), sp_i4.getPin(), sp_i4.getValue(), reader1.getD0pinN(), reader1.getD0Value(), reader1.getD1PinN(), reader1.getD1Value(), reader1.getRLedPinN(), reader1.getRLedPin(), reader1.getGLedPinN(), reader1.getGLedPin(), reader1.getBzPinN(), reader1.getBzPin(), reader2.getD0pinN(), reader2.getD0Value(), reader2.getD1PinN(), reader2.getD1Value(), reader2.getRLedPinN(), reader2.getRLedPin(), reader2.getGLedPinN(), reader2.getGLedPin(), reader2.getBzPinN(), reader2.getBzPin());
-        return 1;
-    };
-    ShellFunctor::getInstance().add("getalldata", getAllData);
 
     return 0;
 }
