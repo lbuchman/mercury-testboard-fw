@@ -1,0 +1,34 @@
+BasedOnStyle: LLVM
+Language: Cpp
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterEnum: false
+  AfterControlStatement: false
+  AfterFunction: false
+  AfterNamespace: true
+  AfterStruct: false
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: false
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 140
+
+AllowShortEnumsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Always
+AllowShortFunctionsOnASingleLine: All
+
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
+ConstructorInitializerIndentWidth: 4
+PackConstructorInitializers: Never
+
+ReflowComments: false
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+AccessModifierOffset: -4
+SpaceBeforeParens: ControlStatements
