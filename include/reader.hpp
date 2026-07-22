@@ -22,7 +22,7 @@ public:
         digitalWrite(pins.d0.pinN, pins.d0.defValue);
         digitalWrite(pins.d1.pinN, pins.d1.defValue);
         pins.serial.begin(SERIAL_BAUDRATE);
-        osdpTask.enable();
+        // osdpTask.enable(); no biaa on line, reader will fail
     }
 
     void begin() {
