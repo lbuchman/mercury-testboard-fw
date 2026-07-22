@@ -1,0 +1,8 @@
+{
+    "name": "mercuryNetworking",
+    "dependencies": {
+        "NativeEthernet": "https://github.com/vjmuzik/NativeEthernet.git"
+    },
+    "frameworks": "arduino",
+    "platforms": "teensy"
+}
