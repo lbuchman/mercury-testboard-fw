@@ -92,6 +92,17 @@ void initNetworking(Scheduler& ts, sllibMod& watchDogLed, bool networkConfigVali
 
 bool startNetwork(unsigned long timeout, unsigned long responseTimeout, sllibMod& watchDogLed) {
     TNetworkConfig netConfig = getNetworkConfig();
+
+    if (netConfig.tag == -1) {
+        logger().info(logger().printHeader, (char*)__FILE__, __LINE__, "Invalid network EEPROM config; generating random MAC");
+        netConfig.mac[0] = 0x02;
+        for (size_t i = 1; i < sizeof(netConfig.mac); ++i) {
+            netConfig.mac[i] = (uint8_t)random(0x100);
+        }
+        netConfig.tag = netSettingsTag;
+        network2eeprom(netConfig);
+    }
+
     bool retStatus = false;
 
     logger().info(logger().printHeader, (char*)__FILE__, __LINE__, "Configuring ethernet adapter DHCP, MAC = %s ...",
