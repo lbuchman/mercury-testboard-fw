@@ -71,7 +71,7 @@ int setupFw() {
     logger().setLogLevel(logLevel::kLogInfo);
 
     watchDogTask.enable();
-    // enableWatchdog();
+    enableWatchdog();
     watchDogLed.begin();
     boardInit();
     bool networkConfigValid = persistentDataInit();
