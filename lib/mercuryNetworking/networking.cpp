@@ -77,10 +77,11 @@ void initNetworking(Scheduler& ts, sllibMod& watchDogLed, bool networkConfigVali
     ShellFunctor::getInstance().add("setmac", setmac);
 
     if (!networkConfigValid) {
+        // Invalid/blank EEPROM (e.g. a fresh board): don't bail out here, startNetwork() itself will
+        // detect the invalid tag, auto-generate and persist a Honeywell-OUI MAC, and bring Ethernet up.
         watchDogLed.ledNoDHCPIp();
-        logger().error(logger().printHeader, (char*)__FILE__, __LINE__,
-                       "Invalid network EEPROM configuration; set a MAC address and reboot");
-        return;
+        logger().warn(logger().printHeader, (char*)__FILE__, __LINE__,
+                      "Invalid network EEPROM configuration; auto-generating a MAC address");
     }
 
     startNetwork(4000, 3900, watchDogLed); // to prevent watchdog reset
@@ -91,6 +92,7 @@ void initNetworking(Scheduler& ts, sllibMod& watchDogLed, bool networkConfigVali
 }
 
 bool startNetwork(unsigned long timeout, unsigned long responseTimeout, sllibMod& watchDogLed) {
+    watchdog(); // feed watchdog on entry; this function can block for the duration of DHCP negotiation
     TNetworkConfig netConfig = getNetworkConfig();
 
     if (netConfig.tag == -1) {
@@ -129,11 +131,13 @@ bool startNetwork(unsigned long timeout, unsigned long responseTimeout, sllibMod
     if (!digitalRead(CcnfigNetPin)) {
         IPAddress ip(192, 168, 0, 60);
         IPAddress myDns(192, 168, 0, 6);
+        watchdog(); // feed watchdog immediately before the blocking Ethernet.begin() call
         Ethernet.begin(netConfig.mac, ip, myDns);
         watchDogLed.ledWatchdog();
         return true;
     }
 
+    watchdog(); // feed watchdog immediately before the blocking DHCP negotiation below
     if (Ethernet.begin(netConfig.mac, timeout, responseTimeout) == 0) {
         logger().info(logger().printHeader, (char*)__FILE__, __LINE__, "Failed to configure Ethernet using DHCP");
         retStatus = false;
