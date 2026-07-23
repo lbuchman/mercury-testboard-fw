@@ -95,12 +95,30 @@ bool startNetwork(unsigned long timeout, unsigned long responseTimeout, sllibMod
 
     if (netConfig.tag == -1) {
         logger().info(logger().printHeader, (char*)__FILE__, __LINE__, "Invalid network EEPROM config; generating random MAC");
-        netConfig.mac[0] = 0x02;
-        for (size_t i = 1; i < sizeof(netConfig.mac); ++i) {
-            netConfig.mac[i] = (uint8_t)random(0x100);
-        }
+        netConfig.mac[0] = 0x58;
+        netConfig.mac[1] = 0xFC;
+        netConfig.mac[2] = 0xC8;
+        uint32_t hostId = 0xFFFFFF - (uint32_t)random(50000);
+        netConfig.mac[3] = (hostId >> 16) & 0xFF;
+        netConfig.mac[4] = (hostId >> 8) & 0xFF;
+        netConfig.mac[5] = hostId & 0xFF;
         netConfig.tag = netSettingsTag;
         network2eeprom(netConfig);
+    }
+
+    bool macIsZero = true;
+    for (size_t i = 0; i < sizeof(netConfig.mac); ++i) {
+        if (netConfig.mac[i] != 0) {
+            macIsZero = false;
+            break;
+        }
+    }
+
+    if (macIsZero) {
+        logger().error(logger().printHeader, (char*)__FILE__, __LINE__,
+                       "MAC address is all-zero; skipping Ethernet bring-up. Set a valid MAC with setmac and reboot.");
+        watchDogLed.ledNoDHCPIp();
+        return false;
     }
 
     bool retStatus = false;
@@ -108,7 +126,7 @@ bool startNetwork(unsigned long timeout, unsigned long responseTimeout, sllibMod
     logger().info(logger().printHeader, (char*)__FILE__, __LINE__, "Configuring ethernet adapter DHCP, MAC = %s ...",
                   macToString(netConfig.mac).c_str());
 
-    if (digitalRead(CcnfigNetPin)) {
+    if (!digitalRead(CcnfigNetPin)) {
         IPAddress ip(192, 168, 0, 60);
         IPAddress myDns(192, 168, 0, 6);
         Ethernet.begin(netConfig.mac, ip, myDns);
